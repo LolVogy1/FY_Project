@@ -22,12 +22,40 @@ style.use('ggplot')
 import numpy as np
 import scipy.spatial
 import geopy.distance
+from collections import defaultdict
 
 #TODO
 #panning wihtout toolbar
-#add plot on top of current one
-#A* only works in a certain direction (make graph undirected)
+#remove existing lines
 
+"""only used if using A star algorithm"""
+class Node:
+    def __init__(self, parent = None, position = None):
+        self.parent = parent
+        self.position = position
+        self.g = 0
+        self.h = 0
+        self.f = 0
+    def __eq__(self, other):
+        return self.position == other.position
+
+"""graph class for use in Dijkstra's algorithm"""
+class Graph:
+    def __init__(self):
+        #will be a dictionary of all connected nodes e.g {(X,Y):[(X:Y),(X,Y)]}
+        self.edges = defaultdict(list)
+        #a set of weights between every set of two connected nodes. 
+        #The tuple of nodes is the key e.g {((X,Y),(X.Y)): 1.2,((X,Y),(X.Y)): 1.4 }
+        self.weights = {}
+        
+    def add_edge(self, from_node, to_node, weight):
+        #adds the edge and the weight of the edge
+        #assumes edge is bi-directional
+        self.edges[from_node].append(to_node)
+        self.edges[to_node].append(from_node)
+        self.weights[(from_node, to_node)] = weight
+        self.weights[(to_node,from_node)] = weight
+        
 class MapGUI:
     
     def __init__(self, window):
@@ -46,6 +74,27 @@ class MapGUI:
         self.starty = tk.DoubleVar()
         self.endx = tk.DoubleVar()
         self.endy = tk.DoubleVar()
+        #add button to mark clicks
+        self.buttonMark = tk.Button(window, text = "Mark Start", command = lambda : self.toggleOn())
+        self.buttonMark2 = tk.Button(window, text = "Mark End", command = lambda : self.toggleOn2())
+
+        
+    def toggleOn(self):
+            markOn = self.markOn.get()
+            if markOn == 0:
+                #so you cant mark the start and the end point at the same time
+                self.markOn.set(1)
+                self.markOn2.set(0)
+            else:
+                self.markOn.set(0)
+            
+    def toggleOn2(self):
+        markOn = self.markOn2.get()
+        if markOn == 0:
+            self.markOn.set(0)
+            self.markOn2.set(1)
+        else:
+            self.markOn2.set(0)
     
     def openfile(self):
         #open file dialog window
@@ -94,10 +143,7 @@ class MapGUI:
         self.drawmap(coordList)
                 
     def drawmap(self,coordList):
-        #set up graph
-        fig1, ax1 = plt.subplots()
-        fig1.set_size_inches(8, 6)
-        
+     
         #make a 2D list of coordinates
         coordList2D = list()
         for i in coordList:
@@ -106,7 +152,7 @@ class MapGUI:
         """converts a list of coordinates into a graph for pathfinding """    
         def graphConvert(coords):
             #create an empty list for the graph
-            graph = list()
+            graph = []
             for i in range(0, len(coords)-1):
                 #if the start of the edge is not the end node
                 if i != len(coords)-1:
@@ -115,22 +161,26 @@ class MapGUI:
                     edge = (coords[i],coords[i+1], dist)
                     graph.append(edge)
                     #add edge in opposite direction (graph is undirected)
-                    dist =  geopy.distance.distance(coords[i+1],coords[i]).km
-                    edge = (coords[i+1],coords[i], dist)
-                    graph.append(edge)
+                    #dist =  geopy.distance.distance(coords[i+1],coords[i]).km
+                    #edge = (coords[i+1],coords[i], dist)
+                    #graph.append(edge)
                 else:
                     break
-            return graph
+            #make a graph object
+            dGraph = Graph()
+            #add the edges to the graph
+            for edge in graph:
+                dGraph.add_edge(*edge)
+            return dGraph
             
         mGraph = graphConvert(coordList2D)
         
-        #add button to mark clicks
-        self.buttonMark = tk.Button(window, text = "Mark Start", command = lambda : toggleOn())
-        self.buttonMark.pack()
-        self.buttonMark2 = tk.Button(window, text = "Mark End", command = lambda : toggleOn2())
-        self.buttonMark2.pack()
         self.buttonCalc = tk.Button(window, text = "Find Path", command = lambda : findPath(coordList2D, mGraph))
-        self.buttonCalc.pack()
+        self.buttonClear = tk.Button(window, text = "Clear Markers", command = lambda : clearWindow(coordList2D))
+        self.buttonCalc.place(x=800,y=633)
+        self.buttonClear.place(x=900,y=633)
+        self.buttonMark.place(x=800,y=600)
+        self.buttonMark2.place(x=900,y=600)
         
         #split coordinates into x and y
         long = [x[0] for x in coordList]
@@ -138,151 +188,21 @@ class MapGUI:
         
         #creates a ckdtree for identifying closest data point to a click
         points = np.column_stack([long,lat])
+        #has to be global
+        global ckdtree
         ckdtree = scipy.spatial.cKDTree(points)
          
-        canvas = FigureCanvasTkAgg(fig1, window)   
-        canvas.get_tk_widget().pack(side=tk.LEFT, fill=tk.BOTH)
-        
-        # creating the Matplotlib toolbar 
-        toolbar = NavigationToolbar2Tk(canvas, window) 
-        toolbar.update() 
-        
         #plot coordinates
+        ax1.clear()
         ax1.plot(long,lat)
-        ax1.axis('off')
+        #rescale axes
+        ax1.relim()
+        ax1.autoscale_view()
+        #ax1.axis('off')
+        fig1.canvas.draw()
         #scale = 1.5
         #f = zoom_factory(plot1,base_scale = scale)
         
-        def toggleOn():
-            markOn = self.markOn.get()
-            if markOn == 0:
-                #so you cant mark the start and the end point at the same time
-                self.markOn.set(1)
-                self.markOn2.set(0)
-            else:
-                self.markOn.set(0)
-            
-        def toggleOn2():
-            markOn = self.markOn2.get()
-            if markOn == 0:
-                self.markOn.set(0)
-                self.markOn2.set(1)
-            else:
-                self.markOn2.set(0)
-                
-                
-        def findPath(coords, mapGraph):
-            #if you haven't set a start and end point
-            testStart = self.startx.get()
-            testEnd = self.endx.get()
-            startPoint = (testStart, self.starty.get())
-            endPoint = (testEnd, self.endy.get())
-            if testStart == 0.0 or testEnd == 0.0:
-                mb.showerror("Missing Points!","You haven't marked a start/end point")
-            else:
-                path = aStar(startPoint, endPoint, mapGraph)
-                long = [x[0] for x in path]
-                lat = [y[1] for y in path]
-                ax1.plot(long,lat,color = "blue")
-                fig1.canvas.draw()
-                print(path)
-        
-        """A* algorithm"""
-        def aStar(start, endp, graph):
-            #empty list of visited nodes
-            visited = list()
-            #add the starting point to the list of visited nodes
-            visited.append(start)
-            current = start
-            end = endp
-            f = float('inf')
-            #total distance travelled so far
-            g = 0
-            print("Start:",current)
-            print("End:",end)
-            while current != end:
-                #empty list of neighbours
-                neighbours = list()
-                tempG = 0
-                """getting all of the neighbouring nodes"""
-                for edge in graph:
-                    #if the starting node is the current one and the end node has not been visited
-                    if edge[0] == current and edge[1] not in visited:
-                        print("found a neighbour")
-                        #estimate the distance from the neighbour to the end
-                        h = geopy.distance.distance(edge[1], end).km
-                        #make a neighbour
-                        distance = edge[2]
-                        neighbour = (edge[1], distance, h)
-                        neighbours.append(neighbour)
-                        
-                """find the best neighbour"""
-                for neighbour in neighbours:
-                    #if the end node is found
-                    print(neighbour)
-                    if neighbour[0] == end:
-                        visited.append(neighbour[0])
-                        current = end
-                        print("End reached")
-                    else:
-                        if len(neighbours) > 1:
-                            #try to quickly find a path from each neighbour to the end and return the total distance
-                            #if it cant just estimates anyway
-                            estimate2end = quick_path(current,neighbour[0], graph, end)
-                        else:
-                            estimate2end = neighbour[2]
-                            
-                        #distance of edge + distance to end
-                        tempG = g + neighbour[1]
-                        tempF = tempG + estimate2end
-                        #if the total distance is lower than the current neighbour
-                        if tempF < f:
-                            f = tempF
-                            #select this node as the best one
-                            current = neighbour[0]
-                            tempG = neighbour[1]
-                        #exception if there is only one neighbour
-                        elif len(neighbours) == 1:
-                            f = tempF
-                            current = neighbour[0]
-                            tempG= neighbour[1]
-                        else:
-                            continue
-
-                    #add the neighbour to the visited nodes
-                    visited.append(current)
-                    g += tempG
-                    #set the current node to this one
-                    print("next node:",current)
-            print("total distance:",g)
-            return visited
-        
-        def quick_path(node, neighbour, graph, end):
-            visited = list()
-            visited.append(node)
-            current = neighbour
-            g = 0
-            while current != end:
-                neighbours = list()
-                for edge in graph:
-                    #if the starting node is the current one and the end node has not been visited
-                    if edge[0] == current and edge[1] not in visited:
-                        #estimate the distance from the neighbour to the end
-                        #make a neighbour
-                        distance = edge[2]
-                        neighbour = (edge[1], distance)
-                        neighbours.append(neighbour)
-                if len(neighbours) == 1:
-                    g += neighbours[0][1]
-                    if neighbours[0][0] == end:
-                        current = end
-                    visited.append(current)
-                    current = neighbours[0][0]
-                else:
-                    estimate = geopy.distance.distance(current, end).km
-                    return estimate
-            return g
-                
         """display info on click"""
         def on_click(event):
             if event.inaxes is not None:
@@ -293,14 +213,14 @@ class MapGUI:
                 #plots a circle on click (Start)
                 if self.markOn.get() == 1:
                     #mark on map
-                    ax1.plot(nearestpoint[0],nearestpoint[1], 'o')
+                    start, = ax1.plot(nearestpoint[0],nearestpoint[1], 'o')
                     fig1.canvas.draw()
                     #record coordinates
                     self.startx.set(nearestpoint[0])
                     self.starty.set(nearestpoint[1])
-                    #hide the button to mark the start point
+                    #disable the button and stops you from adding another point
                     self.markOn.set(0)
-                    self.buttonMark.pack_forget()
+                    self.buttonMark['state']= 'disabled'
                 #plots a square on click (End)
                 elif self.markOn2.get() == 1:
                     ax1.plot(nearestpoint[0],nearestpoint[1], 's')
@@ -308,16 +228,140 @@ class MapGUI:
                     self.endy.set(nearestpoint[1])
                     fig1.canvas.draw()
                     self.markOn2.set(0)
-                    self.buttonMark2.pack_forget()
+                    self.buttonMark2['state']= 'disabled'
                 
             else:
                 #if the click occurred outside the axes
                 print("clicked outside")
-        
-                
-        #connect on click event to plot
+            
+        #connect on click event to the figure
         fig1.canvas.callbacks.connect('button_press_event',on_click)
         
+        """clears the additional markers and path"""
+        def clearWindow(coords):
+            long = [x[0] for x in coords]
+            lat = [y[1] for y in coords]
+            #clear the plot
+            ax1.clear()
+            #redraw
+            ax1.plot(long,lat)
+            #ax1.axis('off')
+            fig1.canvas.draw()
+            #restore button functionality
+            self.buttonCalc['state'] = 'normal'
+            self.buttonMark['state'] = 'normal'
+            self.buttonMark2['state'] = 'normal'
+        
+        def findPath(coords, mapGraph):
+            #if you haven't set a start and end point
+            testStart = self.startx.get()
+            testEnd = self.endx.get()
+            startPoint = (testStart, self.starty.get())
+            endPoint = (testEnd, self.endy.get())
+            if testStart == 0.0 or testEnd == 0.0:
+                mb.showerror("Missing Points!","You haven't marked a start/end point")
+            else:
+                #calculate the path
+                path = dijkstra(startPoint, endPoint, mapGraph)
+                long = [x[0] for x in path]
+                lat = [y[1] for y in path]
+                #plot
+                ax1.plot(long,lat,color = "blue")
+                fig1.canvas.draw()
+                #disable button
+                self.buttonCalc['state'] = 'disabled'
+
+        def dijkstra(start, end, dGraph):
+                        
+            shortestPaths = {start: (None,0)}
+            current = start
+            visited = set()
+            
+            while current != end:
+                visited.add(current)
+                destinations = dGraph.edges[current]
+                weightToCurrent = shortestPaths[current][1]
+                
+                for nextNode in destinations:
+                    weight = dGraph.weights[(current,nextNode)] + weightToCurrent
+                    if nextNode not in shortestPaths:
+                        shortestPaths[nextNode] = (current, weight)
+                    else:
+                        currentShortestWeight = shortestPaths[nextNode][1]
+                        if currentShortestWeight > weight:
+                            shortestPaths[nextNode] = (current, weight)
+                            
+                nextDestinations = {node: shortestPaths[node] for node in shortestPaths 
+                                    if node not in visited}
+                if not nextDestinations:
+                    return "Route not Possible"
+                
+                current = min(nextDestinations, key = lambda k: nextDestinations[k][1])
+                
+            path = []
+            while current is not None:
+                path.append(current)
+                nextNode = shortestPaths[current][0]
+                current = nextNode
+            return path[::1]
+                
+                
+        """A* algorithm"""
+        """"not used"""
+    
+        def aStar(start,end, graph):
+            
+            openList = list()
+            closedList = list()
+            startNode = Node(None, start)
+            startNode.g = startNode.h = startNode.f = 0
+            endNode = Node(None, end)
+            endNode.g = endNode.h = endNode.f = 0
+            openList.append(startNode)
+            
+            while len(openList) > 0:
+                currentNode = openList[0]
+                currentIndex = 0
+                
+                for index, item in enumerate(openList):
+                    if item.f < currentNode.f:
+                        currentNode = item
+                        currentIndex = index
+                openList.pop(currentIndex)
+                closedList.append(currentNode)
+                print(currentNode.position)
+                
+                if currentNode == endNode:
+                    print("reached the end")
+                    path = []
+                    current = currentNode
+                    while current is not None:
+                        path.append(current.position)
+                        current = current.parent
+                    return path[::-1]
+                children = []
+                distanceList = []
+                
+                for edge in graph:
+                    if edge[0] == currentNode.position:
+                        newNode = Node(currentNode, edge[1])
+                        children.append(newNode)
+                        distanceList.append(edge[2])
+                        
+                for index, child in enumerate(children):
+                    #if the child has been visited already
+                    #ignore it
+                    for closedChild in closedList:
+                        if child == closedChild:
+                            continue
+                    child.g = currentNode.g + distanceList[index]
+                    child.h = geopy.distance.distance(child.position,endNode.position).km
+                    child.f = child.g + child.h
+                    for openNode in openList:
+                        if child == openNode and child.g > openNode.g:
+                            continue
+                    openList.append(child)
+
         
 
 
@@ -368,8 +412,11 @@ def zoom_factory(ax,base_scale = 2.):
     fig.canvas.mpl_connect('scroll_event',zoom_fun)
     #return the function
     return zoom_fun
-'''
-    
+''' 
+#set up graph
+fig1, ax1 = plt.subplots()
+fig1.set_size_inches(8, 6)
+#ax1.axis('off')
 
 #set up GUI
 window = tk.Tk()
@@ -377,5 +424,10 @@ window.geometry("1000x700")
 window.title("GPS Mapper")
 #initialise GUI 
 mapgui = MapGUI(window)
+canvas = FigureCanvasTkAgg(fig1, window)   
+canvas.get_tk_widget().pack(side=tk.LEFT, fill=tk.BOTH)
+toolbar = NavigationToolbar2Tk(canvas, window) 
+toolbar.update() 
 window.mainloop()
+    
 
