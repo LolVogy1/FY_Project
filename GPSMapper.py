@@ -100,7 +100,7 @@ class MapGUI:
         #open file dialog window
         filepath = filedialog.askopenfilename(filetypes=(("Map files", "*.kml"),("All Files", "*.")))
         #get only the file name
-        filepath = os.path.split(filepath)[1]
+        #filepath = os.path.split(filepath)[1]
         #parse the file
         self.openmap(filepath)
             
@@ -247,6 +247,7 @@ class MapGUI:
             ax1.clear()
             #redraw
             ax1.plot(long,lat)
+            ax1.axis('off')
             #ax1.axis('off')
             fig1.canvas.draw()
             #restore button functionality
