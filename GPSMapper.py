@@ -77,6 +77,9 @@ class MapGUI:
         #add button to mark clicks
         self.buttonMark = tk.Button(window, text = "Mark Start", command = lambda : self.toggleOn())
         self.buttonMark2 = tk.Button(window, text = "Mark End", command = lambda : self.toggleOn2())
+        self.labelClick = tk.Label(window, text = "Last Click:")
+        self.labelX = tk.Label(window)
+        self.labelY = tk.Label(window)
 
         
     def toggleOn(self):
@@ -186,6 +189,8 @@ class MapGUI:
         long = [x[0] for x in coordList]
         lat = [y[1] for y in coordList]
         
+        
+        
         #creates a ckdtree for identifying closest data point to a click
         points = np.column_stack([long,lat])
         #has to be global
@@ -210,8 +215,11 @@ class MapGUI:
             if event.inaxes is not None:
                 #get the closest co-ordinates of the click
                 nearestpoint = closest_point_coords(ckdtree, event.xdata, event.ydata).tolist()
-                print("clicked on:", event.xdata, event.ydata)
-                print("nearest point:", nearestpoint[0], nearestpoint[1] )
+                self.labelX.configure(text = nearestpoint[0])
+                self.labelY.configure(text = nearestpoint[1])
+                self.labelClick.place(x = 800, y = 500)
+                self.labelX.place(x = 800, y = 530)
+                self.labelY.place(x = 800, y = 560)
                 #plots a circle on click (Start)
                 if self.markOn.get() == 1:
                     #mark on map
