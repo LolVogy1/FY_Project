@@ -159,6 +159,7 @@ class MapGUI:
         self.labelClick = tk.Label(window, text = "Last Click:")
         self.labelX = tk.Label(window)
         self.labelY = tk.Label(window)
+        self.pathdistance = tk.Label(window)
 
     #toggles marking the start points
     def toggleStart(self):
@@ -346,7 +347,8 @@ class MapGUI:
             self.starty.set(0.0)
             self.endx.set(0.0)
             self.endy.set(0.0)
-        
+            self.pathdistance.place_forget()
+            
         """calculate the shortest path and plot it"""
         def findPath(coords, mapGraph):
             #if you haven't set a start and end point
@@ -412,6 +414,9 @@ class MapGUI:
                 nextNode = shortestPaths[current][0]
                 current = nextNode
             #return the reversed path (start to end)
+            dist = "Distance of path: "+str(round(shortestPaths[end][1],3))+" km"
+            self.pathdistance.configure(text = dist)
+            self.pathdistance.place(x = 650, y = 450)
             return path[::1]
                 
 
