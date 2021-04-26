@@ -265,6 +265,11 @@ class MapGUI:
         self.starty.set(0.0)
         self.endx.set(0.0)
         self.endy.set(0.0)
+        #in case another file is opened
+        self.pathdistance.place_forget()
+        self.buttonCalc['state'] = 'normal'
+        self.buttonMarkStart['state'] = 'normal'
+        self.buttonMarkEnd['state'] = 'normal'
         
         #split coordinates into x and y
         long = [x[0] for x in coordList]
