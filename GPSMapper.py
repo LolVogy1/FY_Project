@@ -47,6 +47,7 @@ class Graph:
         self.weights[(to_node,from_node)] = weight
         
 """enables use of panning and zooming in matplotlib"""
+#referenced from https://stackoverflow.com/questions/11551049/matplotlib-plot-zooming-with-scroll-wheel
 class ZoomPan:
     def __init__(self):
         self.press = None
@@ -251,7 +252,6 @@ class MapGUI:
         
         #create a graph from the co-ordinates    
         mGraph = graphConvert(coordList2D)
-        print(mGraph.edges)
         
         #buttons to calculate path and mark points appear once the map is drawn
         self.buttonCalc = tk.Button(window, text = "Find Path", command = lambda : findPath(coordList2D, mGraph))
@@ -458,5 +458,6 @@ canvas.get_tk_widget().pack(side=tk.LEFT, fill=tk.BOTH)
 #toolbar.update() 
 window.mainloop()
     
+
 
 
